@@ -164,3 +164,47 @@ mlflow_experiments_store/
 mlflow_experiments_store_sqlite/
 mydb.sqlite
 test_artifact.txt
+
+# Final project: local environments, secrets and generated storage
+.env
+.env.*
+!.env_template
+.python/
+.cache/
+.runtime/
+mlruns/
+mlartifacts/
+*.sqlite
+*.sqlite3
+*.db
+*.csv
+*.parquet
+*.pkl
+*.pickle
+*.cbm
+minio_data/
+minio-data/
+volumes/
+.aws/
+**/.ipynb_checkpoints/
+
+# Runtime stores and dataset formats
+artifacts/
+runtime/
+mle-mlflow-runtime/
+*.tsv
+*.npy
+*.npz
+*.sqlite*
+
+# Additional generated datasets, runtime logs and temporary files
+/data/
+/datasets/
+logs/
+*.jsonl
+*.feather
+*.arrow
+*.tmp
+*.temp
+*.pid
+*.db-*

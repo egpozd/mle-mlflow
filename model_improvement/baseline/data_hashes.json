@@ -1,0 +1,29 @@
+{
+  "data/initial_data.csv": {
+    "size": 19414324,
+    "md5": "84045cd0f0e5a6f7a36eb4e2320fa41f",
+    "match": true,
+    "expected": {
+      "size": 19414324,
+      "md5": "84045cd0f0e5a6f7a36eb4e2320fa41f"
+    }
+  },
+  "data/train.csv": {
+    "size": 13499140,
+    "md5": "2d4bb3ba2091eb269bc56a93f05f9119",
+    "match": true,
+    "expected": {
+      "size": 13499140,
+      "md5": "2d4bb3ba2091eb269bc56a93f05f9119"
+    }
+  },
+  "data/test.csv": {
+    "size": 3375734,
+    "md5": "1d5874c7f4950c457e1ff2678d44a121",
+    "match": true,
+    "expected": {
+      "size": 3375734,
+      "md5": "1d5874c7f4950c457e1ff2678d44a121"
+    }
+  }
+}

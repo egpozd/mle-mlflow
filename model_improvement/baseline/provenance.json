@@ -1,0 +1,57 @@
+{
+  "baseline_origin": "reconstructed",
+  "data_reproduction": "byte_identical",
+  "historical_metrics": "exact",
+  "model_binary_matches_historical": false,
+  "source_project_git_sha": "e2decc886f6a9a5d633ff6e710ba2a74cf2db6a2",
+  "historical_model_md5": "ee7aa528bbdcdc207747e7ddc1194182",
+  "reconstructed_model_md5": "bd7cc21e56d9b904832d7c3ed2878e82",
+  "artifacts": {
+    "data/initial_data.csv": {
+      "size": 19414324,
+      "md5": "84045cd0f0e5a6f7a36eb4e2320fa41f",
+      "match": true,
+      "expected": {
+        "size": 19414324,
+        "md5": "84045cd0f0e5a6f7a36eb4e2320fa41f"
+      }
+    },
+    "data/train.csv": {
+      "size": 13499140,
+      "md5": "2d4bb3ba2091eb269bc56a93f05f9119",
+      "match": true,
+      "expected": {
+        "size": 13499140,
+        "md5": "2d4bb3ba2091eb269bc56a93f05f9119"
+      }
+    },
+    "data/test.csv": {
+      "size": 3375734,
+      "md5": "1d5874c7f4950c457e1ff2678d44a121",
+      "match": true,
+      "expected": {
+        "size": 3375734,
+        "md5": "1d5874c7f4950c457e1ff2678d44a121"
+      }
+    },
+    "models/fitted_model.pkl": {
+      "size": 1269774,
+      "md5": "bd7cc21e56d9b904832d7c3ed2878e82",
+      "match": false,
+      "expected": {
+        "size": 1261390,
+        "md5": "ee7aa528bbdcdc207747e7ddc1194182"
+      }
+    },
+    "cv_results/metrics.json": {
+      "size": 95,
+      "md5": "c76d1f590d0cafcb94f4078b26faca6f",
+      "match": true,
+      "expected": {
+        "size": 95,
+        "md5": "c76d1f590d0cafcb94f4078b26faca6f"
+      }
+    }
+  },
+  "evidence": "CSV and metrics MD5 and size match dvc.lock. Reconstructed pickle differs. Historical per-row predictions were unavailable for a direct comparison."
+}
