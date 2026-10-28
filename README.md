@@ -1,186 +1,117 @@
-# Улучшение модели стоимости недвижимости
+# Улучшение baseline-модели
 
-Учебный проект: исследование данных и улучшение baseline CatBoostRegressor.
-MLflow **2.7.1** использует PostgreSQL для Tracking и Model Registry.
-Эксперимент: `real_estate_model_improvement`, модель: `real_estate_price_model`.
-Version **1** — восстановленный baseline. Stage 2 выполнен; Stage 3–5 впереди.
-Stage 2 успешно залогирован в локальном MLflow; run имеет статус **FINISHED**. Baseline Registry Version 1 не изменена.
+Учебный проект посвящён прогнозированию стоимости недвижимости и продолжает работу предыдущего спринта по подготовке данных и обучению CatBoostRegressor. Основная метрика — RMSE. В проекте исследовано влияние генерации и отбора
+признаков, а также настройки гиперпараметров. Результаты экспериментов и версии моделей сохранены в MLflow.
 
-## Структура и этапы
+## Особенности выполнения проекта
 
-- **Stage 1:** восстановление baseline и проверка исторических метрик.
-- **Stage 2:** [единый notebook](model_improvement/model_improvement.ipynb) и [выводы EDA](model_improvement/eda_conclusions.md).
-- **Stage 3:** генерация признаков — предстоит.
-- **Stage 4:** отбор признаков — предстоит.
-- **Stage 5:** подбор гиперпараметров — предстоит.
+В связи с проблемами доступности учебной облачной инфраструктуры Яндекс Практикума проект был выполнен в локальном окружении. Вместо учебной виртуальной машины использовались Docker Desktop, локально развёрнутые PostgreSQL и
+MLflow Tracking Server. Артефакты экспериментов сохранялись в локальном файловом хранилище. Это позволило выполнить все этапы, провести эксперименты и зарегистрировать модели в MLflow Model Registry. Yandex Object Storage (S3)
+фактически не использовалось.
 
-## Stage 2: исследовательский анализ
+## Используемые технологии
 
-Использован только historical train: **112 734 строки, 15 столбцов**.
-Данные читаются из `../mle-baseline-recovery/data/train.csv`; абсолютный путь задаётся
-в начале notebook. CSV не копируются в Git. Выполняйте ячейки по порядку в существующем окружении Python 3.10.
-Основные таблицы и графики сохранены в notebook.
+Python 3.10, pandas, scikit-learn, CatBoost, autofeat, mlxtend, Optuna, MLflow 2.7.1, PostgreSQL, Docker Desktop и Jupyter Notebook. Для визуализаций использованы Matplotlib и Seaborn.
 
-Проверены пропуски, дубликаты, распределение цены, числовые и категориальные признаки,
-география, Pearson/Spearman и гипотезы об относительных площадях, этажах и взаимодействиях.
+## Этапы работы
 
-- Пропусков нет; полных повторов сверх первого вхождения — **5 858**.
-- Средняя цена **18,52 млн ₽**, медиана **11,85 млн ₽**, асимметрия **10,17**.
-  На объекты выше P99 приходится **73,81%** суммы квадратов отклонений target от среднего.
-- Pearson общей и жилой площадей — **0,961**; найдено **4** нарушения суммы площадей.
-- Цены различаются по этажам, периодам, типам зданий и местоположению.
-  Эти наблюдения не доказывают причинность или прирост качества новых признаков.
-- Приоритеты Stage 3: доли площадей, положение этажа, пространственные взаимодействия;
-  отдельно проверить логарифмирование target. CatBoost уже умеет учитывать нелинейности.
+1. **Stage 1 — Baseline.** Исходная CatBoost-модель восстановлена на основе результатов предыдущего спринта, проверена по историческим данным и метрикам и зарегистрирована как V1. Метаданные происхождения сохранены в
+   `model_improvement/baseline/`.
+2. **Stage 2 — EDA.** Исследованы распределения цены и признаков, корреляции, зависимости, выбросы и возможные факторы стоимости. Выводы сохранены в notebook, отдельном [Markdown-отчёте](model_improvement/eda_conclusions.md) и
+   MLflow.
+3. **Stage 3 — Feature Generation.** Проверены предметные признаки, `PolynomialFeatures`, `KBinsDiscretizer` и `autofeat`. Преобразования объединены через `ColumnTransformer` и `sklearn.Pipeline`. Для продолжения выбрана
+   конфигурация F2 с 24 признаками; модель зарегистрирована как V2.
+4. **Stage 4 — Feature Selection.** Выполнены Sequential Forward Selection (SFS) и Sequential Backward Selection (SBS) из `mlxtend`. Выбрана конфигурация с восемью признаками, зарегистрирована V3.
+5. **Stage 5 — Hyperparameter Tuning.** Сравнены `RandomizedSearchCV` и Optuna с `TPESampler` и `MLflowCallback`. По групповой кросс-валидации выбрана конфигурация RandomizedSearchCV. Итоговый Pipeline зарегистрирован как V4.
 
-**Ограничение historical split:** отдельный предыдущий аудит выявил точное совпадение с train
-у **2 930 строк test (10,396%)**, по 14 признакам — у **6 299 (22,350%)**.
-Историческая оценка может быть оптимистичной. Test в EDA не загружается и не используется для выбора
-преобразований; split сохраняется для сопоставимости с baseline. Дубликаты и выбросы не удаляются.
+## Результаты
 
-### Логирование Stage 2
+Оценка на historical test:
 
-Имя run: `stage2_eda`, существующий experiment: `real_estate_model_improvement`.
-Локальный MLflow Server восстановлен. Experiment ID: **1**.
-Run ID: `4c473e93c8814486a68005667ca7dc31`, статус: **FINISHED**.
-[Открыть run](http://127.0.0.1:5000/#/experiments/1/runs/4c473e93c8814486a68005667ca7dc31).
+| Версия | Этап | RMSE, руб. | MAE, руб. | R² |
+|---|---|---:|---:|---:|
+| V1 | Baseline | 10 547 270,06 | 3 744 622,81 | 0,894899 |
+| V2 | Feature Generation | 10 594 103,15 | 3 749 084,73 | 0,893964 |
+| V3 | Feature Selection | 11 811 402,85 | 3 795 846,93 | 0,868196 |
+| V4 | Hyperparameter Tuning | 10 995 267,83 | 3 533 863,89 | 0,885782 |
 
-Проверены три artifacts: `stage2/model_improvement.ipynb`, `stage2/eda_conclusions.md`,
-`stage2/log_stage2.py`; их SHA256 совпадают с локальными файлами. Baseline Version 1 не изменена.
-Notebook и отчёт сохранены как снимок исследования до восстановления сервера: их прежние
-сообщения о недоступности MLflow относятся к предыдущей проверке; текущий статус указан здесь.
-Снимок сохранён без изменений для соответствия MLflow artifacts.
+По основной метрике RMSE лучший результат сохранился у V1. Настройка гиперпараметров снизила RMSE относительно V3, а V4 получила минимальную MAE среди четырёх моделей. Улучшить исходный baseline по RMSE не удалось: усложнение
+обработки признаков не всегда повышает качество прогнозирования.
 
-Для воспроизводимого повторного запуска логирования того же снимка:
+## Структура проекта
 
-```powershell
-.\.venv\Scripts\python.exe -B mlflow_server/log_stage2.py
-# При необходимости явно указать исторический train:
-.\.venv\Scripts\python.exe -B mlflow_server/log_stage2.py --train-path C:\Users\egpoz\mle-baseline-recovery\data\train.csv
+```text
+mle-mlflow/
+├── mlflow_server/                   # запуск MLflow и логирование Stage 1–2
+├── model_improvement/
+│   ├── baseline/                    # метаданные исходной модели
+│   ├── model_improvement.ipynb       # единый notebook Stage 2–5
+│   ├── eda_conclusions.md           # выводы EDA
+│   ├── stage3/                      # генерация признаков
+│   ├── stage4/                      # отбор признаков
+│   └── stage5/                      # настройка гиперпараметров
+├── .env_template
+├── requirements.txt
+└── README.md
 ```
 
-Скрипт проверяет health, соответствие PostgreSQL/Registry и расположение artifacts,
-затем логирует notebook, Markdown-отчёт, исходник логирования, показатели EDA,
-параметры исследования и контрольные суммы train. Тот же снимок файлов повторно не создаёт run.
-При недоступности сервера останавливается; file-based tracking и новые эксперименты не создаёт.
-Модель и baseline Version 1 не меняются.
+## Локальный запуск
 
-## Локальная разработка — Stage 1 проверен
-
-Локальные health, PostgreSQL backend, filesystem artifacts, Registry Version 1,
-загрузка модели и три исторические метрики проверены **2026-10-26**.
-Это сохранённый результат Stage 1, а не утверждение о текущей доступности сервера.
-
-Docker Compose в `../mle-local-infra` сохраняет PostgreSQL и Airflow.
-MinIO исключён после нехватки диска; для локальных artifacts используется файловая система.
-Существующие Docker volumes и таблицы `flats`/`buildings` сохраняются.
-
-- PostgreSQL: отдельная БД/пользователь `mlflow`, хост `127.0.0.1`, порт `5433`.
-- Tracking URI: `http://127.0.0.1:5000`, только loopback. SQLite не используется.
-- Artifact root: file URI каталога `../mle-mlflow-runtime/artifacts`, вычисляется из пути checkout.
-- Логи, временные файлы и результаты проверок: `../mle-mlflow-runtime`, вне Git.
-- Используется существующее окружение Python 3.10 `.venv`.
-
-Сохраните рабочий `.env`. Для новой установки скопируйте `.env_template` и заполните
-пароль БД и путь восстановления локально. Не перезаписывайте рабочие секреты.
-`MLFLOW_STORAGE_MODE=local` выбирает файловое хранение; локальный launcher явно выбирает local независимо от S3-переменных.
+Команды ниже рассчитаны на настроенное Windows-окружение с PowerShell, Docker Desktop, Python 3.10 и виртуальным окружением `.venv` в корне репозитория. Версии зависимостей указаны в `requirements.txt`:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip check
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+Docker Compose находится **вне репозитория**, в `..\mle-local-infra` (в текущем окружении — `C:\Users\egpoz\mle-local-infra`). Для запуска нужны этот каталог с конфигурацией и подготовленные БД и пользователь `mlflow`. Настройки
+подключения задаются в локальном `.env` по образцу `.env_template`; секреты в Git не включены.
+
+Если PostgreSQL и MLflow ещё не запущены, из корня репозитория:
+
+```powershell
+docker compose -f ..\mle-local-infra\docker-compose.yml up -d postgres
 .\mlflow_server\run_server_local.ps1
-# Совместимый alias: .\mlflow_server\run_server.ps1
-# В другом терминале:
+```
+
+PostgreSQL доступен на `127.0.0.1:5433`. Команда Compose запускает сервер БД, но не восстанавливает историю экспериментов. Launcher MLflow работает в текущем терминале и явно выбирает локальное хранение.
+
+В другом терминале можно проверить сервер и открыть notebook:
+
+```powershell
 Invoke-RestMethod http://127.0.0.1:5000/health
-.\.venv\Scripts\python.exe -B mlflow_server/register_baseline.py
-# Проверка целостности исходных данных только на чтение:
-.\.venv\Scripts\python.exe -B mlflow_server/provision_postgres.py --verify-only
+.\.venv\Scripts\python.exe -m jupyterlab model_improvement/model_improvement.ipynb
 ```
 
-Для перезапуска используются существующие миграции: provisioning и обновление схемы не нужны.
-Launchers работают на переднем плане. Ранее фоновый запуск сохранил PID в
-`../mle-mlflow-runtime/mlflow_server.pid`, логи — в `logs/` этого runtime.
-Останавливайте только соответствующие MLflow-процессы; Docker volumes не удаляйте.
+Интерфейс MLflow: [http://127.0.0.1:5000](http://127.0.0.1:5000).
 
-При `--no-serve-artifacts` клиенту нужен доступ к тем же локальным путям на Windows.
-Расположение artifacts эксперимента хранится в PostgreSQL: смена server default не переносит старые artifacts.
-Старый `Default` может ссылаться на прежний S3 root; используйте именованный эксперимент проекта.
+Для повторного выполнения нужны historical `train.csv` и `test.csv` предыдущего спринта, расположенные в `..\mle-baseline-recovery\data`. Train содержит 112 734 строки, test — 28 184. CSV не входят в Git; их происхождение и
+контрольные суммы описаны в метаданных baseline. Путь к train для EDA задаётся в начале notebook.
 
-## Yandex / S3 — подготовлено, production-проверка не выполнена
+Каталоги `mle-local-infra`, `mle-baseline-recovery` и `mle-mlflow-runtime` не создаются одним клонированием этого репозитория. Для повторного выполнения части ячеек нужны сохранённые runtime JSON или их восстановление из MLflow. В
+частности, Stage 5 использует `reports/results.json` и `design/winner_before_C.json`, восстановленные как `results.json` и `winner_before_C.json` в `..\mle-mlflow-runtime\stage5` либо в каталоге `STAGE5_RUNTIME_DIR`.
 
-Реальные production credentials ещё не проверялись. Launcher `mlflow_server/run_server.sh`
-явно выбирает S3 и читает переменные окружения или локальный untracked `.env`.
-Для PostgreSQL задаются `MLFLOW_DB_HOST`, `MLFLOW_DB_PORT`, `MLFLOW_DB_NAME=mlflow`,
-`MLFLOW_DB_USER=mlflow`, `MLFLOW_DB_PASSWORD`.
+Готовые таблицы, графики и выводы доступны в сохранённых outputs [основного notebook](model_improvement/model_improvement.ipynb) без повторного обучения. Полные эксперименты Stage 3–5 запускаются отдельными модулями этапов с флагом `--run`;
+обычное чтение сохранённых результатов их не повторяет.
 
-```sh
-export MLFLOW_STORAGE_MODE=s3
-export MLFLOW_ARTIFACT_ROOT=s3://YOUR_BUCKET/YOUR_PREFIX
-export MLFLOW_S3_ENDPOINT_URL=https://storage.yandexcloud.net
-export AWS_DEFAULT_REGION=ru-central1
-# AWS_ACCESS_KEY_ID и AWS_SECRET_ACCESS_KEY передаются через секретное окружение.
-# Также задайте MLFLOW_DB_*, BASELINE_RECOVERY_DIR и нужный MLFLOW_TRACKING_URI.
-sh mlflow_server/run_server.sh
-.venv/bin/python -B mlflow_server/register_baseline.py
-```
+## MLflow
 
-Заранее создайте bucket и предоставьте сервисному аккаунту чтение/запись объектов.
-Доступ к artifacts прямой, без MLflow artifact proxy. Сервер слушает loopback:
-для удалённого доступа нужен аутентифицированный TLS reverse proxy или SSH tunnel.
-Переменная `PYTHON` позволяет выбрать совместимый интерпретатор.
+- Experiment: `real_estate_model_improvement`.
+- Локальный Experiment ID: `1`. Он относится к этому экземпляру PostgreSQL/MLflow и может отличаться в другом окружении.
+- Registered Model: `real_estate_price_model`.
+- Зарегистрированные версии: `1`, `2`, `3`, `4`, статус `READY`.
+- Финальная модель Stage 5: `models:/real_estate_price_model/4`.
+- Итоговый Stage 5 Run ID: `52b6764852554b4eb42d49cc5106430a`.
 
-Для финального запуска используйте **отдельный production-инстанс PostgreSQL** с выделенной
-БД/пользователем `mlflow` и зарегистрируйте Version 1 там. Повторное использование локальной БД
-не переносит artifacts в S3. Скрипт регистрации отклоняет несовпадение artifact location
-и по умолчанию повторно использует существующую Version 1.
-Локальный Stage 2 logger не предназначен для S3; production-проверка остаётся отдельной задачей.
+Основные runs: `reconstructed_baseline_v1`, `stage2_eda`, `stage3_feature_generation`, `stage4_feature_selection` и `stage5_hyperparameter_tuning`. В MLflow сохранены параметры, метрики, код, модели, окружения, signatures и отчёты
+соответствующих этапов.
 
-## Восстановленный baseline и проверка Stage 1
+Артефакты находятся в `..\mle-mlflow-runtime\artifacts`, история Tracking и Registry — в локальной PostgreSQL. Модели, артефакты и база данных не хранятся в GitHub. Для доступа к текущим `file://` URI нужен тот же локальный
+artifact storage.
 
-Регистрация читает `../mle-baseline-recovery` без изменения файлов и переобучения.
-До загрузки доверенного pickle проверяются размеры и MD5. Логируются параметры модели/разбиения,
-метрики, provenance, контрольные суммы, исходники, окружения, модель CatBoost,
-signature, пример из пяти строк и зависимости модели. CSV и pickle в Git не добавляются.
+В конфигурации предусмотрен S3-launcher `mlflow_server/run_server.sh`, но эксперименты проекта выполнены с файловым хранилищем. Сохранённые notebook и отчёты в MLflow являются снимками этапов; сообщения о статусе логирования или
+регистрации внутри ранних снимков относятся к моменту их сохранения.
 
-| Метрика | Точное значение |
-|---|---:|
-| RMSE | 10547270.062205384 |
-| MAE | 3744622.8052026215 |
-| R2 | 0.8948994777286887 |
+## Ограничения результатов
 
-| Файл | Исторический MD5 |
-|---|---|
-| initial_data.csv | 84045cd0f0e5a6f7a36eb4e2320fa41f |
-| train.csv | 2d4bb3ba2091eb269bc56a93f05f9119 |
-| test.csv | 1d5874c7f4950c457e1ff2678d44a121 |
-| metrics.json | c76d1f590d0cafcb94f4078b26faca6f |
-| fitted_model.pkl | ee7aa528bbdcdc207747e7ddc1194182 |
-
-MD5 восстановленного pickle: `bd7cc21e56d9b904832d7c3ed2878e82`.
-CSV и метрики совпадают побайтово; pickle отличается. Исторических индивидуальных предсказаний
-нет, восстановленная модель воспроизводит агрегированные метрики.
-SHA исходного проекта: `e2decc886f6a9a5d633ff6e710ba2a74cf2db6a2`.
-
-Скрипт Stage 1 проверяет связи experiment/run, метрики, параметры, теги, artifacts и signature,
-загружает `models:/real_estate_price_model/1`, пересчитывает метрики на 28 184 historical test-строках.
-Предсказания должны совпадать с восстановленной моделью; допуски:
-`rel_tol=1e-12`, `abs_tol=1e-10`.
-Результат: `../mle-mlflow-runtime/stage1_verification.json`.
-Это проверка Stage 1, а не использование test в EDA.
-
-Повторный обычный запуск переиспользует Version 1 без нового run/version.
-Локальный эксклюзивный lock предотвращает одновременную регистрацию на этой машине;
-распределённого lock нет. `--force-new-version` — явный opt-in, для Stage 1 не нужен.
-
-## Файлы и зависимости
-
-`model_improvement/baseline/` содержит небольшие метаданные воспроизводимости.
-Корневые `run_mlflow_server*.sh` и `test_mlflow_*.ipynb` — старые упражнения;
-используйте launchers из `mlflow_server/`. MinIO-сборки и загрузка его исходников не нужны.
-
-`.gitignore` исключает `.env`, `.venv`, runtime artifacts, CSV, модели, SQLite и checkpoints.
-`requirements.txt` фиксирует проверенные прямые зависимости Python 3.10 и выбранные
-совместимые зависимости MLflow, но не является полным транзитивным lock-файлом.
-Исследовательские библиотеки сохранены для дальнейших этапов.
-`psycopg2-binary` нужен backend `postgresql+psycopg2`;
-setuptools закреплён из-за использования MLflow 2.7.1 модуля `pkg_resources`.
-Собственный загрузчик `.env` не требует python-dotenv; wheel не является runtime-зависимостью.
+В данных встречаются повторяющиеся комбинации характеристик объектов, поэтому для внутренних оценок применялась групповая валидация. Historical test имеет известные пересечения с train и уже использовался в истории разработки.
+Полученные метрики не являются строгой независимой оценкой качества на совершенно новых объектах. Кроме того, CV Stage 5 относится к набору признаков, ранее выбранному на Development, а не ко всей процедуре отбора и настройки.
