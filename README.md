@@ -17,12 +17,23 @@ Python 3.10, pandas, scikit-learn, CatBoost, autofeat, mlxtend, Optuna, MLflow 2
 
 1. **Stage 1 — Baseline.** Исходная CatBoost-модель восстановлена на основе результатов предыдущего спринта, проверена по историческим данным и метрикам и зарегистрирована как V1. Метаданные происхождения сохранены в
    `model_improvement/baseline/`.
+   Для регистрации использовалась команда `.\.venv\Scripts\python.exe -B mlflow_server/register_baseline.py`; она также проверяет модель на historical test и не нужна для просмотра готовых результатов.
+   [Shell-скрипт запуска MLflow](mlflow_server/run_server.sh) предусмотрен для S3-конфигурации; локальный PowerShell-launcher приведён ниже.
 2. **Stage 2 — EDA.** Исследованы распределения цены и признаков, корреляции, зависимости, выбросы и возможные факторы стоимости. Выводы сохранены в notebook, отдельном [Markdown-отчёте](model_improvement/eda_conclusions.md) и
    MLflow.
 3. **Stage 3 — Feature Generation.** Проверены предметные признаки, `PolynomialFeatures`, `KBinsDiscretizer` и `autofeat`. Преобразования объединены через `ColumnTransformer` и `sklearn.Pipeline`. Для продолжения выбрана
-   конфигурация F2 с 24 признаками; модель зарегистрирована как V2.
+   конфигурация F2: 14 исходных признаков, 6 попарных взаимодействий `total_area`, `rooms`, `floors_total`, `build_year` и 4 признака дискретизации площадей `total_area`, `living_area`, `kitchen_area` и высоты потолков `ceiling_height`.
+   Всего получено 24 признака; модель зарегистрирована как V2. На historical test генерация признаков не улучшила RMSE относительно V1.
 4. **Stage 4 — Feature Selection.** Выполнены Sequential Forward Selection (SFS) и Sequential Backward Selection (SBS) из `mlxtend`. Выбрана конфигурация с восемью признаками, зарегистрирована V3.
+   Сокращение набора не улучшило RMSE на historical test: результат V3 хуже V2 и исходной V1.
 5. **Stage 5 — Hyperparameter Tuning.** Сравнены `RandomizedSearchCV` и Optuna с `TPESampler` и `MLflowCallback`. По групповой кросс-валидации выбрана конфигурация RandomizedSearchCV. Итоговый Pipeline зарегистрирован как V4.
+   Настройка снизила historical test RMSE относительно V3, но не позволила превзойти V1.
+
+### Основные выводы EDA
+
+- У цены выражен правый хвост: среднее — 18,52 млн руб., медиана — 11,85 млн руб. На объекты выше P99 приходится 73,81% суммы квадратов отклонений цены от среднего; это вклад в разброс target, а не в ошибки модели.
+- Цена положительно связана с общей площадью: Pearson — 0,783, Spearman — 0,764.
+- Медиана цены различается по этажным группам: первый этаж — 9,90 млн руб., промежуточные — 12,00 млн руб., последний — 11,50 млн руб. Различия не доказывают причинного влияния этажа.
 
 ## Результаты
 
@@ -57,6 +68,13 @@ mle-mlflow/
 
 ## Локальный запуск
 
+Клонирование репозитория и переход в каталог проекта:
+
+```powershell
+git clone https://github.com/egpozd/mle-mlflow.git
+cd mle-mlflow
+```
+
 Команды ниже рассчитаны на настроенное Windows-окружение с PowerShell, Docker Desktop, Python 3.10 и виртуальным окружением `.venv` в корне репозитория. Версии зависимостей указаны в `requirements.txt`:
 
 ```powershell
@@ -79,6 +97,7 @@ PostgreSQL доступен на `127.0.0.1:5433`. Команда Compose зап
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:5000/health
+Start-Process 'http://127.0.0.1:5000'
 .\.venv\Scripts\python.exe -m jupyterlab model_improvement/model_improvement.ipynb
 ```
 
@@ -102,8 +121,17 @@ Invoke-RestMethod http://127.0.0.1:5000/health
 - Финальная модель Stage 5: `models:/real_estate_price_model/4`.
 - Итоговый Stage 5 Run ID: `52b6764852554b4eb42d49cc5106430a`.
 
-Основные runs: `reconstructed_baseline_v1`, `stage2_eda`, `stage3_feature_generation`, `stage4_feature_selection` и `stage5_hyperparameter_tuning`. В MLflow сохранены параметры, метрики, код, модели, окружения, signatures и отчёты
-соответствующих этапов.
+Основные MLflow runs:
+
+| Этап | Названия runs |
+|---|---|
+| Stage 1 | `reconstructed_baseline_v1` |
+| Stage 2 | `stage2_eda` |
+| Stage 3 | `stage3_baseline_grouped`, `stage3_manual_features`, `stage3_sklearn_features`, `stage3_autofeat`, `stage3_feature_generation` |
+| Stage 4 | `stage4_feature_screening`, `stage4_sfs`, `stage4_sbs`, `stage4_feature_selection` |
+| Stage 5 | `stage5_baseline_grouped`, `stage5_randomized_search`, `stage5_optuna`, `stage5_hyperparameter_tuning` |
+
+В MLflow сохранены параметры, метрики, код, модели, окружения, signatures и отчёты соответствующих этапов.
 
 Артефакты находятся в `..\mle-mlflow-runtime\artifacts`, история Tracking и Registry — в локальной PostgreSQL. Модели, артефакты и база данных не хранятся в GitHub. Для доступа к текущим `file://` URI нужен тот же локальный
 artifact storage.

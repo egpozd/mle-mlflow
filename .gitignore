@@ -208,3 +208,4 @@ logs/
 *.temp
 *.pid
 *.db-*
+*.cache
